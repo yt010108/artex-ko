@@ -41,28 +41,27 @@ var platformToolKeys = []string{
 // Platform-level (not a per-task tool): operates on the global, cross-task asset库.
 func (s *Server) toolDeleteAssetsByHost() actool.CoreTool {
 	return wrTool("delete_assets_by_host",
-		"按 host 精确删除资产：删掉该 host 的域名/子域名，以及其下的服务(service)、接口(endpoint)。\n"+
-			"host 完全匹配(小写、去空格)，不是模糊/通配。\n"+
-			"传根域名(如 example.com)会连带删除它的子域名及其服务/接口；传子域名(如 a.example.com)或 IP 只删该 host 自身及其服务/接口。\n"+
-			"⚠️ 硬删除、作用于全局资产库(跨任务共享)、不可撤销。",
+		"host와 정확히 일치하는 자산을 전역 목록에서 삭제합니다. 해당 호스트 아래의 서비스(service)와 엔드포인트(endpoint)도 삭제됩니다.\n"+
+			"대소문자로 정규화하고 공백을 제거해 정확히 비교하며 퍼지·와일드카드 검색은 하지 않습니다. 루트 도메인(example.com)을 지정하면 하위 도메인과 그 서비스·엔드포인트까지 삭제합니다. 하위 도메인(a.example.com)이나 IP를 지정하면 해당 호스트와 그 아래 항목만 삭제합니다.\n"+
+			"삭제는 모든 작업이 공유하는 자산 목록에 적용되며 되돌릴 수 없습니다.",
 		objSchema(map[string]any{
-			"host": strParam("要删除的 host：域名/子域名/IP。完全匹配，如 example.com 或 a.example.com 或 1.2.3.4"),
+			"host": strParam("host 삭제 대상 : 도메인명/하위도메인명/IP. 정확히 일치(예: example.com, a.example.com 또는 1.2.3.4)"),
 		}, "host"),
 		func(_ context.Context, in json.RawMessage) (actool.Result, error) {
 			as := s.assetStore()
 			if as == nil {
-				return actool.Errorf("资产库未初始化"), nil
+				return actool.Errorf("자산 라이브러리가 초기화되지 않았습니다."), nil
 			}
 			var a struct {
 				Host string `json:"host"`
 			}
 			_ = json.Unmarshal(in, &a)
 			if strings.TrimSpace(a.Host) == "" {
-				return actool.Errorf("host 不能为空"), nil
+				return actool.Errorf("host는 비워둘 수 없습니다."), nil
 			}
 			counts, err := as.DeleteByHost(a.Host)
 			if err != nil {
-				return actool.Errorf("删除失败: " + err.Error()), nil
+				return actool.Errorf("삭제 실패:" + err.Error()), nil
 			}
 			var total int64
 			for _, n := range counts {
@@ -80,24 +79,24 @@ func (s *Server) toolDeleteAssetsByHost() actool.CoreTool {
 
 func (s *Server) toolCreateSkill() actool.CoreTool {
 	return wrTool("create_skill",
-		"创建一个新 skill(写 SKILL.md，agentskills.io 规范)。name 小写字母/数字/连字符。",
+		"새 스킬을 만들고 agentskills.io 형식의 SKILL.md를 작성합니다. name에는 소문자·숫자·하이픈을 사용하세요.",
 		objSchema(map[string]any{
-			"name":         strParam("skill 名(小写字母开头，字母/数字/连字符)"),
-			"description":  strParam("skill 描述(必填，说明它做什么/何时用)"),
-			"instructions": strParam("Markdown 正文说明(可选)"),
+			"name":         strParam("skill 이름(소문자로 시작, 문자/숫자/하이픈)"),
+			"description":  strParam("skill 설명(필수, 기능/사용 시기 설명)"),
+			"instructions": strParam("Markdown 텍스트 설명(선택사항)"),
 		}, "name", "description"),
 		func(_ context.Context, in json.RawMessage) (actool.Result, error) {
 			var a struct{ Name, Description, Instructions string }
 			_ = json.Unmarshal(in, &a)
 			if !validSkillName(a.Name) {
-				return actool.Errorf("skill 名不合法(小写字母开头，仅字母/数字/连字符，≤64)"), nil
+				return actool.Errorf("잘못된 스킬 이름입니다(소문자로 시작, 소문자·숫자·하이픈만 사용, 최대 64자)"), nil
 			}
 			if strings.TrimSpace(a.Description) == "" {
-				return actool.Errorf("description 必填"), nil
+				return actool.Errorf("description 필수"), nil
 			}
 			path := filepath.Join(s.skillDir, a.Name)
 			if _, err := os.Stat(path); err == nil {
-				return actool.Errorf("skill 已存在: " + a.Name), nil
+				return actool.Errorf("스킬이 이미 존재합니다: " + a.Name), nil
 			}
 			if err := os.MkdirAll(path, 0o755); err != nil {
 				return actool.Errorf(err.Error()), nil
@@ -122,21 +121,21 @@ func (s *Server) toolCreateSkill() actool.CoreTool {
 
 func (s *Server) toolUpdateSkillFile() actool.CoreTool {
 	return wrTool("update_skill_file",
-		"写/覆盖某个 skill 内的一个文件(默认 SKILL.md)。用于修改技能内容或加脚本/引用。",
+		"특정 skill(기본값 SKILL.md) 내의 파일을 쓰거나 덮어씁니다. 스킬 콘텐츠를 수정하거나 스크립트/참조를 추가하는 데 사용됩니다.",
 		objSchema(map[string]any{
-			"name":    strParam("skill 名"),
-			"file":    strParam("相对路径(可选，默认 SKILL.md，如 scripts/run.py)"),
-			"content": strParam("文件完整内容"),
+			"name":    strParam("skill 이름"),
+			"file":    strParam("상대 경로(선택 사항, 기본값 SKILL.md, 예: scripts/run.py)"),
+			"content": strParam("파일의 전체 내용"),
 		}, "name", "content"),
 		func(_ context.Context, in json.RawMessage) (actool.Result, error) {
 			var a struct{ Name, File, Content string }
 			_ = json.Unmarshal(in, &a)
 			if !validSkillName(a.Name) {
-				return actool.Errorf("skill 名不合法"), nil
+				return actool.Errorf("skill 이름이 불법입니다"), nil
 			}
 			skillPath := filepath.Join(s.skillDir, a.Name)
 			if _, err := os.Stat(skillPath); os.IsNotExist(err) {
-				return actool.Errorf("skill 不存在: " + a.Name), nil
+				return actool.Errorf("skill이 존재하지 않습니다:" + a.Name), nil
 			}
 			rel := strings.TrimSpace(a.File)
 			if rel == "" {
@@ -144,7 +143,7 @@ func (s *Server) toolUpdateSkillFile() actool.CoreTool {
 			}
 			clean, msg := skillRelPath(rel)
 			if msg != "" {
-				return actool.Errorf("非法路径: " + msg), nil
+				return actool.Errorf("잘못된 경로:" + msg), nil
 			}
 			full := filepath.Join(skillPath, clean)
 			if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
@@ -173,13 +172,13 @@ type customToolToolInput struct {
 func customToolSchema(keyDesc string) map[string]any {
 	return objSchema(map[string]any{
 		"key":         strParam(keyDesc),
-		"description": strParam("发给模型的描述"),
-		"kind":        strParam("shell | command | script(仅Python) | http。shell=bash 环境声明(仅告知模型该工具可在 bash 中直接调用，无需 exec/schema)；其余三种需提供 exec"),
-		"exec":        map[string]any{"type": "object", "description": "执行规格(shell 类型不需要): command→{command}; script→{code}; http→{method,url,headers,body,proxy,use_recording_proxy}"},
-		"schema":      map[string]any{"type": "object", "description": "参数 JSON-Schema(shell/command/script 可留空; http 必填且需含 properties)"},
-		"agents":      map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "绑定的 agent key(可选)"},
-		"deferred":    map[string]any{"type": "boolean", "description": "是否延迟(shell 类型无效；仅 command/script/http 的不常用工具才开)"},
-		"enabled":     map[string]any{"type": "boolean", "description": "是否启用(默认 true)"},
+		"description": strParam("모델에게 전송된 설명"),
+		"kind":        strParam("shell | command | script(Python 전용) | http. shell=bash 환경 설명(도구가 bash에서 직접 호출될 수 있다는 점만 모델에 알리고 exec/schema은 필요하지 않음) 나머지 3개는 exec를 제공해야 합니다."),
+		"exec":        map[string]any{"type": "object", "description": "실행 사양(shell 유형에는 필요하지 않음): command→{command}; script→{code}; http→{method,url,headers,body,proxy,use_recording_proxy}"},
+		"schema":      map[string]any{"type": "object", "description": "매개변수 JSON-Schema(shell/command/script는 비워둘 수 있습니다. http는 필수이며 properties를 포함해야 합니다.)"},
+		"agents":      map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "도구를 사용할 에이전트 key 목록(선택 사항)"},
+		"deferred":    map[string]any{"type": "boolean", "description": "도구를 지연 로드할지 여부. shell에는 사용할 수 없고 command/script/http 도구에만 적용됩니다."},
+		"enabled":     map[string]any{"type": "boolean", "description": "활성화 여부(기본값 true)"},
 	}, "key", "kind")
 }
 
@@ -195,23 +194,23 @@ func toDBTool(a customToolToolInput) *db.Tool {
 }
 
 func (s *Server) toolCreateCustomTool() actool.CoreTool {
-	return wrTool("create_custom_tool", "【重要】当安装一些平台没有的工具时，调用该工具将安装的工具放入平台中，让平台可以调用！创建一个自定义工具(shell/command/script/http)。shell=bash 环境声明，只需 key+description+agents，无需 exec/schema。",
-		customToolSchema("工具 key(小写字母开头，字母/数字/下划线)"),
+	return wrTool("create_custom_tool", "사용자 지정 도구(shell/command/script/http)를 플랫폼에 등록합니다. 외부 도구를 설치했다면 이 도구로 등록해야 에이전트가 호출할 수 있습니다. shell은 bash 환경을 설명하는 유형으로 key, description, agents만 필요하며 exec/schema는 사용하지 않습니다.",
+		customToolSchema("도구 key(소문자, 문자/숫자/밑줄로 시작)"),
 		func(_ context.Context, in json.RawMessage) (actool.Result, error) {
 			var a customToolToolInput
 			_ = json.Unmarshal(in, &a)
 			a.Key = strings.TrimSpace(a.Key)
 			if !reToolKey.MatchString(a.Key) {
-				return actool.Errorf("key 需小写字母开头，仅含小写字母/数字/下划线"), nil
+				return actool.Errorf("key 소문자로 시작해야 하며 소문자/숫자/밑줄만 포함할 수 있습니다."), nil
 			}
 			if a.Kind != "shell" && a.Kind != "command" && a.Kind != "script" && a.Kind != "http" {
-				return actool.Errorf("kind 需为 shell / command / script / http"), nil
+				return actool.Errorf("kind는 shell / command / script / http이어야 합니다."), nil
 			}
 			if a.Kind == "http" && !hasSchemaProps(a.Schema) {
-				return actool.Errorf("http 工具必须提供参数 JSON Schema(不能留空)"), nil
+				return actool.Errorf("http 도구는 매개변수 JSON Schema를 제공해야 합니다(비워둘 수 없음)."), nil
 			}
 			if exist, _ := s.m.pg.GetTool(a.Key); exist != nil {
-				return actool.Errorf("该 key 已存在: " + a.Key), nil
+				return actool.Errorf("key는 이미 존재합니다:" + a.Key), nil
 			}
 			if err := s.m.pg.CreateCustomTool(toDBTool(a)); err != nil {
 				return actool.Errorf(err.Error()), nil
@@ -221,20 +220,20 @@ func (s *Server) toolCreateCustomTool() actool.CoreTool {
 }
 
 func (s *Server) toolUpdateCustomTool() actool.CoreTool {
-	return wrTool("update_custom_tool", "修改一个已有的自定义工具(按 key)。",
-		customToolSchema("要修改的自定义工具 key"),
+	return wrTool("update_custom_tool", "key로 기존 사용자 지정 도구를 찾아 수정합니다.",
+		customToolSchema("수정될 맞춤 도구 key"),
 		func(_ context.Context, in json.RawMessage) (actool.Result, error) {
 			var a customToolToolInput
 			_ = json.Unmarshal(in, &a)
 			existing, _ := s.m.pg.GetTool(a.Key)
 			if existing == nil || existing.System {
-				return actool.Errorf("只能修改自定义工具: " + a.Key), nil
+				return actool.Errorf("사용자 정의 도구만 수정할 수 있습니다." + a.Key), nil
 			}
 			if a.Kind != "shell" && a.Kind != "command" && a.Kind != "script" && a.Kind != "http" {
-				return actool.Errorf("kind 需为 shell / command / script / http"), nil
+				return actool.Errorf("kind는 shell / command / script / http이어야 합니다."), nil
 			}
 			if a.Kind == "http" && !hasSchemaProps(a.Schema) {
-				return actool.Errorf("http 工具必须提供参数 JSON Schema(不能留空)"), nil
+				return actool.Errorf("http 도구는 매개변수 JSON Schema를 제공해야 합니다(비워둘 수 없음)."), nil
 			}
 			if err := s.m.pg.UpdateCustomTool(toDBTool(a)); err != nil {
 				return actool.Errorf(err.Error()), nil
@@ -259,18 +258,18 @@ type mcpToolInput struct {
 
 func mcpSchema(withID bool) map[string]any {
 	props := map[string]any{
-		"name":      strParam("MCP 服务器名"),
+		"name":      strParam("MCP 서버 이름"),
 		"transport": strParam("stdio | http / sse"),
-		"command":   strParam("stdio 的启动命令(如 npx)"),
-		"args":      map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "命令参数数组"},
-		"env":       map[string]any{"type": "object", "description": "环境变量 {KEY:VALUE}"},
-		"url":       strParam("http/sse 的 URL"),
-		"enabled":   map[string]any{"type": "boolean", "description": "是否启用(默认 true)"},
-		"insecure":  map[string]any{"type": "boolean", "description": "http: 跳过 TLS 证书校验(自签证书时置 true, 默认 false)"},
+		"command":   strParam("stdio 시작 명령(예: npx)"),
+		"args":      map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "명령 매개변수 배열"},
+		"env":       map[string]any{"type": "object", "description": "환경 변수 {KEY:VALUE}"},
+		"url":       strParam("http/sse/URL"),
+		"enabled":   map[string]any{"type": "boolean", "description": "활성화 여부(기본값 true)"},
+		"insecure":  map[string]any{"type": "boolean", "description": "http: TLS 인증서 확인 건너뛰기(자체 서명된 인증서의 경우 true로 설정, 기본값은 false)"},
 	}
 	required := []string{"name", "transport"}
 	if withID {
-		props["id"] = map[string]any{"type": "integer", "description": "要修改的 MCP 服务器 id"}
+		props["id"] = map[string]any{"type": "integer", "description": "수정할 MCP 서버 id"}
 		required = []string{"id", "name", "transport"}
 	}
 	return objSchema(props, required...)
@@ -292,14 +291,14 @@ func (a mcpToolInput) toDB() *db.MCPServer {
 }
 
 func (s *Server) toolCreateMCP() actool.CoreTool {
-	return wrTool("create_mcp", "创建一个 MCP 服务器(stdio/http/sse)。创建后其工具需按 agent 可见性授权。",
+	return wrTool("create_mcp", "MCP 서버(stdio/http/sse)를 등록합니다. 생성 후 에이전트 가시성 설정에서 사용할 도구를 허용하세요.",
 		mcpSchema(false),
 		func(_ context.Context, in json.RawMessage) (actool.Result, error) {
 			var a mcpToolInput
 			_ = json.Unmarshal(in, &a)
 			a.ID = 0
 			if strings.TrimSpace(a.Name) == "" || strings.TrimSpace(a.Transport) == "" {
-				return actool.Errorf("name / transport 必填"), nil
+				return actool.Errorf("name / transport 필수"), nil
 			}
 			id, err := s.m.pg.SaveMCP(a.toDB())
 			if err != nil {
@@ -310,13 +309,13 @@ func (s *Server) toolCreateMCP() actool.CoreTool {
 }
 
 func (s *Server) toolUpdateMCP() actool.CoreTool {
-	return wrTool("update_mcp", "修改一个已有的 MCP 服务器(按 id)。",
+	return wrTool("update_mcp", "기존 MCP 서버를 수정합니다(id 누르기).",
 		mcpSchema(true),
 		func(_ context.Context, in json.RawMessage) (actool.Result, error) {
 			var a mcpToolInput
 			_ = json.Unmarshal(in, &a)
 			if a.ID == 0 {
-				return actool.Errorf("id 必填"), nil
+				return actool.Errorf("id 필수"), nil
 			}
 			if _, err := s.m.pg.SaveMCP(a.toDB()); err != nil {
 				return actool.Errorf(err.Error()), nil

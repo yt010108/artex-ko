@@ -80,7 +80,7 @@ func (g *guardedTool) Call(ctx context.Context, in json.RawMessage, tc *actool.T
 	defer func() {
 		if r := recover(); r != nil {
 			log.Printf("[tools] %s panic: %v\n%s", g.Name(), r, debug.Stack())
-			res, err = actool.Errorf(fmt.Sprintf("工具 %s 内部错误：%v（本次调用已失败，可换个参数或改用别的工具）", g.Name(), r)), nil
+			res, err = actool.Errorf(fmt.Sprintf("도구 %s 내부 오류: %v (이 호출이 실패했습니다. 매개변수를 변경하거나 다른 도구를 사용할 수 있습니다.)", g.Name(), r)), nil
 		}
 	}()
 	return g.CoreTool.Call(ctx, in, tc)

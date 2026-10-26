@@ -3211,13 +3211,13 @@ const promptVersions: PromptVersion[] = [
     version: 3,
     ts: T("2026-07-25T10:00:00Z"),
     note: "권한 우회 탐지 유도 강화",
-    template_text: "你是 ARTEX 的规划者……",
+    template_text: "당신은 ARTEX의 플래너입니다……",
   },
   {
     version: 2,
     ts: T("2026-07-20T10:00:00Z"),
     note: "초기 버전 미세 조정",
-    template_text: "你是 ARTEX 的规划者(v2)……",
+    template_text: "당신은 ARTEX의 플래너입니다(v2)……",
   },
 ];
 
@@ -3225,7 +3225,7 @@ export function agentDetail(key: string): AgentDetail {
   const a = agents.find((x) => x.key === key) ?? agents[1];
   return {
     agent: a,
-    prompt: `你是 ARTEX 的「${a.name}」。\n目标：{{.Goal}}\n资产概览：{{.AssetSummary}}\n路线提示：{{.RouteHint}}\n请基于以上信息推进探索，并通过工具把结果写回图。`,
+    prompt: `당신은 ARTEX의 「${a.name}」입니다.\n목표: {{.Goal}}\n자산 개요: {{.AssetSummary}}\n경로 힌트: {{.RouteHint}}\n위 정보를 바탕으로 탐색하고 도구를 사용해 결과를 그래프에 기록하세요.`,
     variables: promptVars,
     versions: promptVersions,
     visibility: { mcp: [1, 2], skill: ["api-recon", "playwright-cli"] },
@@ -4259,8 +4259,8 @@ export function llmRecordDetail(id: number, records = llmRecords) {
     request_body: JSON.stringify(
       {
         model: item.model,
-        system: "你是一个授权渗透测试系统的「执行者」…（省略）",
-        messages: [{ role: "user", content: "开始执行 system 提示里的这条意图：只做它、只产生事实、做完即停。" }],
+        system: "당신은 승인된 보안 테스트 시스템의 실행 에이전트입니다…(생략)",
+        messages: [{ role: "user", content: "시스템 지침의 이 의도를 실행하세요. 해당 의도만 처리하고 확인한 사실을 기록한 뒤 종료하세요." }],
         tools: ["bash", "insert_assets", "record_fact", "report_finding"],
       },
       null,
@@ -4284,13 +4284,13 @@ export function llmRecordDetail(id: number, records = llmRecords) {
       max_tokens: 8192,
       stream: true,
       system: [
-        { type: "text", text: "你是一个授权渗透测试系统的「执行者」…（省略）", cache_control: { type: "ephemeral" } },
+        { type: "text", text: "당신은 승인된 보안 테스트 시스템의 실행 에이전트입니다…(생략)", cache_control: { type: "ephemeral" } },
       ],
-      messages: [{ role: "user", content: "开始执行 system 提示里的这条意图：只做它、只产生事实、做完即停。" }],
+      messages: [{ role: "user", content: "시스템 지침의 이 의도를 실행하세요. 해당 의도만 처리하고 확인한 사실을 기록한 뒤 종료하세요." }],
       tools: [
         {
           name: "bash",
-          description: "在目标环境中执行一条 shell 命令并返回其输出。",
+          description: "대상 환경에서 셸 명령 하나를 실행하고 결과를 반환합니다.",
           input_schema: { type: "object", properties: { command: { type: "string" } }, required: ["command"] },
         },
       ],

@@ -85,13 +85,13 @@ func wireAgentAugment(pg *db.DB, skillDir string, hostTools func() ([]actool.Cor
 				}
 				cl, err := connectMCP(ctx, m)
 				if err != nil {
-					log.Printf("[mcp] %s 连接失败: %v", m.Name, err)
+					log.Printf("[mcp] %s 연결 실패: %v", m.Name, err)
 					continue
 				}
 				closers = append(closers, cl)
 				ts, err := cl.Tools(ctx)
 				if err != nil {
-					log.Printf("[mcp] %s tools/list 失败: %v", m.Name, err)
+					log.Printf("[mcp] %s tools/list 실패: %v", m.Name, err)
 					continue
 				}
 				for _, t := range ts {
@@ -195,11 +195,11 @@ func seedPrompts(pg *db.DB) {
 	for key, tmpl := range agent.BuiltinPromptSeeds() {
 		a, err := pg.GetAgentByKey(key)
 		if err != nil || a == nil {
-			log.Printf("[prompts] seed %s 跳过: agent 不存在 (%v)", key, err)
+			log.Printf("[prompts] seed %s 건너뛰기: agent가 존재하지 않습니다. (%v)", key, err)
 			continue
 		}
 		if err := pg.SeedPromptIfEmpty(a.ID, tmpl); err != nil {
-			log.Printf("[prompts] seed %s 失败: %v", key, err)
+			log.Printf("[prompts] seed %s 실패: %v", key, err)
 		}
 	}
 }
@@ -218,7 +218,7 @@ func wireTools(pg *db.DB, domainReg map[string]actool.CoreTool) {
 		schema, _ := json.Marshal(s.Schema)
 		agents, _ := json.Marshal(s.Agents)
 		if err := pg.SeedTool(s.Key, s.Desc, schema, agents); err != nil {
-			log.Printf("[tools] seed %s 失败: %v", s.Key, err)
+			log.Printf("[tools] seed %s 실패: %v", s.Key, err)
 		}
 	}
 	// Seed the traffic host tools so they're bindable per-agent like built-ins.
@@ -229,17 +229,17 @@ func wireTools(pg *db.DB, domainReg map[string]actool.CoreTool) {
 	for _, t := range traffic.SeedToolMetas() {
 		schema, _ := json.Marshal(t.InputSchema())
 		if err := pg.SeedTool(t.Name(), t.Description(), schema, trafficAgents); err != nil {
-			log.Printf("[tools] seed %s 失败: %v", t.Name(), err)
+			log.Printf("[tools] seed %s 실패: %v", t.Name(), err)
 		}
 	}
 	// bashInteractiveShellNote is appended to Bash's description ONLY for agents whose
 	// interactive_shell is on, so Bash points at shell_open for interactive programs
 	// without ever referencing a tool that isn't injected (§14.1/§14.2).
-	const bashInteractiveShellNote = "\n\n需要【交互输入】的程序（msfconsole / ssh 交互登录 / mysql、psql、python 等 REPL / 密码或 yes/no 提示 / nc 反弹 shell）不要用 Bash（它没有 stdin、会卡住），改用 shell_open 开交互会话（用完 shell_close）。一次性、非交互命令仍用 Bash。"
+	const bashInteractiveShellNote = "\n\n[대화형 입력]이 필요한 프로그램 (msfconsole / ssh 대화형 로그인 / mysql, psql, python 등 REPL / 비밀번호 또는 yes/no 프롬프트 / nc 리바운드 shell) Bash을 사용하지 마세요(stdin이 없어 멈추게 됩니다). 대신 shell_open를 사용하여 대화형 세션을 엽니다(shell_close를 사용하세요). 일회성 비대화형 명령은 여전히 ​​Bash를 사용합니다."
 	agent.ToolResolve = func(ctx context.Context, agentKey string, tools []actool.CoreTool) []actool.CoreTool {
 		rows, err := pg.ListTools()
 		if err != nil {
-			log.Printf("[tools] 读取工具表失败，按代码默认放行: %v", err)
+			log.Printf("[tools] 도구 테이블을 읽지 못했습니다. 코드에 따른 기본 릴리스: %v", err)
 			return tools
 		}
 		byKey := make(map[string]*db.Tool, len(rows))
@@ -297,7 +297,7 @@ func wireTools(pg *db.DB, domainReg map[string]actool.CoreTool) {
 			}
 		}
 		if len(shellHints) > 0 {
-			note := "\n\n以下工具已安装在此 bash 环境中，可直接通过 Bash 调用：\n" + strings.Join(shellHints, "\n")
+			note := "\n\n이 bash 환경에는 다음 도구가 설치되어 있으며 Bash를 통해 직접 호출할 수 있습니다. \n" + strings.Join(shellHints, "\n")
 			for i, t := range out {
 				if t.Name() == "Bash" {
 					out[i] = agent.DecorateTool(t, t.Description()+note, t.InputSchema())

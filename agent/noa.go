@@ -39,7 +39,7 @@ func enableNoa(opts *agentcore.Options, enabled func() bool, archiveRoot, sessio
 		OnWarn:         onWarn,
 	}); err != nil {
 		if onWarn != nil {
-			onWarn("noa 压缩启用失败,回退内置压缩:" + err.Error())
+			onWarn("noa 압축 활성화 실패, 내장 압축으로 대체:" + err.Error())
 		}
 		return
 	}

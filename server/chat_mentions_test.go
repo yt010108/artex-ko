@@ -19,6 +19,10 @@ import (
 )
 
 func TestChatMentionParsing(t *testing.T) {
+	koRefs, err := parseChatMentions("확인 @[취약점#12 제목] 및 @[엔드포인트#34 GET /api]")
+	if err != nil || len(koRefs) != 2 || koRefs[0].Kind != "finding" || koRefs[1].Kind != "endpoint" {
+		t.Fatalf("Korean refs=%+v err=%v", koRefs, err)
+	}
 	refs, err := parseChatMentions("分析@[漏洞#12 同名] 与 @[接口#34 GET /api] @[漏洞#12 重复] user@example.com @漏洞")
 	if err != nil || len(refs) != 2 || refs[0].Kind != "finding" || refs[1].ID != 34 {
 		t.Fatalf("refs=%+v err=%v", refs, err)
@@ -213,7 +217,7 @@ func TestChatMentionBoundedJSON(t *testing.T) {
 		items[i] = long
 	}
 	v := boundChatMentionValue(map[string]any{"report": long, "scope": items}).(map[string]any)
-	if !strings.Contains(v["report"].(string), "已截断") || len(v["scope"].([]any)) != 101 {
+	if !strings.Contains(v["report"].(string), "잘렸습니다") || len(v["scope"].([]any)) != 101 {
 		t.Fatal("missing truncation markers")
 	}
 	encoded, err := json.Marshal(v)

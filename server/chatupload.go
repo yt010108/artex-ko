@@ -153,7 +153,7 @@ func composeAgentMessage(msg string, atts []chatAttachment, baseDir string) stri
 	// 보내지는 메시지라, 이 문구는 "업로드된 파일을 Read/Bash 로 열라"고 모델에 지시하는 에이전트
 	// 입력(두뇌)이다(BRIEF 경계 #1). 전사는 userActivityWithAttachments 가 첨부 JSON 으로 따로
 	// 렌더하므로 이 헤더 문자열 자체는 표시 경로에 노출되지 않는다(F16 동형 두뇌 전용).
-	b.WriteString("\n\n【用户上传的附件】(绝对路径，需要时用 Read/Bash 查看)：")
+	b.WriteString("\n\n[사용자가 업로드한 첨부 파일](절대 경로, 필요한 경우 Read/Bash를 사용하여 확인):")
 	for _, a := range atts {
 		fmt.Fprintf(&b, "\n- %s（%s）", filepath.Join(baseDir, a.Path), humanBytes(a.Size))
 	}

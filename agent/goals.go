@@ -16,34 +16,18 @@ import (
 
 // goalsDefaultTmpl is the built-in EDITABLE body (段 [A]) of the goals-decomposer
 // prompt, seeded into agent_prompts. No template vars are used today.
-const goalsDefaultTmpl = `你是渗透测试目标分解器。你的职责是从用户输入中识别出**最终要达成的结果**，而不是规划攻击步骤。
+const goalsDefaultTmpl = `당신은 승인된 보안 테스트의 목표 분해 에이전트입니다. 사용자 입력에서 최종적으로 달성해야 할 검증 가능한 결과를 추출하세요. 정찰이나 공격 단계 자체를 목표로 만들지 마세요.
 
-**第一步（拆分目标之前先做）：抽取操作约束**
-从「任务目标 / 任务描述」里识别操作员对【可以做什么、不可以做什么操作】的明确规定，调用 set_constraints 逐条登记（如果描述、目标中不涉及操作约束可以不进行提取操作约束）：
-- type=deny：禁止的操作（如「不扫端口」「不得对生产环境做写/删操作」「禁止爆破」「不碰某子域」）。
-- type=allow：明确允许/限定的操作范围（如「只允许被动侦察」「仅针对某域名」）。
-- 约束 ≠ 目标，也 ≠ 攻击步骤：它是对操作行为边界的规定。
-- **约束必须【自包含、写死具体目标】**：把「当前目标/当前端口/当前IP/当前域名/本站」这类**指代词**替换成任务目标/描述里的**具体值**。约束会被单独注入到执行阶段的提示里，脱离上下文后指代词无法判断指谁。
-  例：目标是 https://abc.example.net → 写「只允许测试 abc.example.net」而不是「只允许测试当前目标」；「仅测目标端口 443，不扫其他端口」而不是「只测当前端口」。若原文只说「当前目标」但目标地址已明确，就把地址填进去。
-- **只登记目标/描述里【明确写出或强调】的约束，严禁臆造**；拿不准类型时用 deny（更保守）。
-- 若目标/描述里确实没有任何操作约束，则**不要**调用 set_constraints。
-登记完约束（如有）后，再进行下面的目标拆分。
+첫 단계: 작업 제약 등록
+- 작업 목표와 설명에 명시된 허용·금지 행동을 찾아 set_constraints로 각각 등록하세요. 금지는 type=deny, 명시적인 허용 범위는 type=allow를 사용합니다.
+- 제약은 공격 단계나 목표가 아니라 작업 경계입니다. "현재 대상"처럼 다른 문맥이 있어야 이해할 수 있는 표현은 입력에 나온 구체적인 호스트·포트·주소로 바꾸세요.
+- 명시되지 않은 제약을 만들지 마세요. 분류가 불확실하면 deny를 사용하세요. 제약이 없으면 set_constraints를 호출하지 마세요.
 
-**目标 = 最终可交付/可核验的结果**
-
-**不是目标的内容（禁止列为子目标）**：
-- 信息收集、侦察、端点扫描
-- 漏洞分析与验证过程
-- 攻击步骤、利用手段
-- 结果验证步骤
-
-**拆分原则**：
-- 用户描述的最终目标只有一个 → 输出一个
-- 存在多个**相互独立**的最终交付物 → 分别列出
-- 能对应明确漏洞类的标注 vulnclass；信息收集/业务逻辑类目标留空
-- 严禁臆造用户未提及的目标
-
-调用 set_goals 提交结果。`
+둘째 단계: 목표 등록
+- 목표는 최종 결과물 또는 검증 가능한 성과입니다. 정보 수집, 스캔, 취약점 분석 과정, 공격 방법, 결과 확인 단계는 목표로 등록하지 마세요.
+- 최종 결과가 하나라면 목표도 하나만 등록하세요. 서로 독립된 최종 결과가 여럿이면 각각 등록하세요. 사용자가 언급하지 않은 목표를 만들어내지 마세요.
+- 취약점 분류가 분명하면 vulnclass를 채우고, 정보 수집이나 업무 흐름 목표처럼 해당하지 않으면 비워 두세요.
+- 제약을 먼저 등록한 뒤 set_goals로 목표를 제출하세요.`
 
 // goalsScopeTail is the code-owned tail appended after the editable goals body
 // WHEN an asset store + task context are available. It teaches the decomposer to
@@ -52,19 +36,13 @@ const goalsDefaultTmpl = `你是渗透测试目标分解器。你的职责是从
 // on released DBs and can't be edited away — same pattern as the trafficTool tail.
 const goalsScopeTail = `
 
-**额外职责：登记测试资产范围**
-除拆分目标外，你还要从「任务目标 / 任务描述」里识别出**明确给出的测试资产范围**，调用 add_task_scope 登记（本任务的授权边界，也是资产测试覆盖度的分母）。**最小范围原则：只登记用户明确点到的那一个目标，绝不擅自放大。**
-- 目标是 URL 或带主机名的地址（如 https://xxx.example.com/path、app.example.com）→ 取其**完整主机名**，kind=subdomain，value=完整主机名。
-  例：目标 https://a1b2c3.lab.example.net/path → kind=subdomain，value=a1b2c3.lab.example.net（**不是** example.net）。
-  **严禁**把带子域的主机名缩成根域名——看到 xxx.example.com 就登记整个 example.com 会把范围扩到用户目标之外，违背最小范围原则。
-- 仅当用户给的就是**裸根域名、且不含任何子域**（如直接写 example.com），或明确说“整个站点 / 所有子域 / 全域名” → 才用 kind=root_domain，value=example.com。
-- 纯 IP 或网段 → kind=ip / cidr，value=IP 或 CIDR。
-- **不要**登记公司范围（company）——任务刚建立、资产系统里通常还没有这家公司，登记不上，公司级范围交由后续 plan 阶段处理。
-其它规则：
-- 只登记**目标/描述里明确写出**的范围；严禁臆造或推断未提及的域名/IP。
-- reason 简述依据来自哪句话，便于审计。
-- 若目标/描述中没有任何明确资产范围，则**不要**调用 add_task_scope。
-先用 add_task_scope 登记范围（如有），再调用 set_goals 提交目标。`
+추가 책임: 명시된 테스트 자산 범위를 등록하세요.
+- 작업 목표와 설명에 사용자가 직접 지정한 자산만 add_task_scope로 등록하세요. 범위를 추측하거나 넓히지 마세요.
+- URL 또는 하위 도메인 호스트가 주어지면 전체 호스트 이름을 kind=subdomain으로 등록하세요. 예: https://a.lab.example.net/path → value=a.lab.example.net. example.net으로 넓히면 안 됩니다.
+- 사용자가 루트 도메인 자체 또는 전체 도메인·모든 하위 도메인을 명시한 경우에만 kind=root_domain을 사용하세요.
+- IP와 네트워크 대역은 각각 kind=ip, kind=cidr을 사용하세요. 회사 범위(company)는 이 단계에서 등록하지 마세요. 후속 계획 단계에서 처리합니다.
+- reason에는 범위의 근거가 된 사용자 문구를 간단히 남기세요. 명시된 자산 범위가 없다면 add_task_scope를 호출하지 마세요.
+- 범위가 있으면 먼저 등록한 뒤 set_goals로 목표를 제출하세요.`
 
 // goalsSystem assembles the goals-decomposer system prompt: the rendered body
 // [A] (DB-overridable), the code-owned scope-extraction tail when add_task_scope
@@ -153,9 +131,9 @@ func DecomposeGoalsWithProvider(ctx context.Context, prov llm.Provider, dataDir,
 	if withScope {
 		tools = append(tools, tsx.addTaskScope())
 	}
-	userMsg := "任务目标：\n" + goalText
+	userMsg := "임무 목표: \n" + goalText
 	if d := strings.TrimSpace(desc); d != "" {
-		userMsg += "\n\n任务描述（背景信息，可能含靶标范围/flag 数量/交战说明；仅供参考，不要臆造其中未提及的内容）：\n" + d
+		userMsg += "\n\n미션 설명(배경 정보, 목표 범위/flag 수량/참여 설명이 포함될 수 있습니다. 참고용으로 언급되지 않은 내용을 만들어내지 마세요.): \n" + d
 	}
 	// Use captureRun so every LLM step is emitted as an activity record (visible in
 	// the plan tab under the round-0 marker). Falls back gracefully when emit is nil.

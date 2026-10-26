@@ -11,6 +11,8 @@ test("mention trigger supports Chinese and cursor placement without hijacking em
 
 test("categories, Chinese aliases, IP and keyword search", () => {
   assert.equal(mentionSearch("").categories.length, 9);
+  assert.equal(mentionSearch("취").categories[0].kind, "finding");
+  assert.equal(mentionSearch("취약점").kind, "finding");
   assert.equal(mentionSearch("漏").categories[0].kind, "finding");
   assert.equal(mentionSearch("漏洞").kind, "finding");
   assert.equal(mentionSearch("漏洞SQL注入").query, "SQL注入");
@@ -20,15 +22,17 @@ test("categories, Chinese aliases, IP and keyword search", () => {
 });
 
 test("tokens roundtrip labels and removing one reference preserves its neighbors", () => {
-  const first = mentionToken({ kind: "finding", id: 12, label: "标题[1]\n描述" });
+  const first = mentionToken({ kind: "finding", id: 12, label: "제목[1]\n설명" });
   const second = mentionToken({ kind: "ip", id: 13, label: "192.0.2.1" });
-  const value = `分析 ${first} 和 ${second}`;
+  const value = `분석 ${first} 와 ${second}`;
   const selected = selectedMentions(value);
+  assert.match(first, /^@\[취약점#12 /);
   assert.equal(selected.length, 2);
   assert.equal(selected[0].kind, "finding");
   assert.equal(selected[0].id, "12");
-  assert.equal(selected[0].text, "标题（1） 描述");
+  assert.equal(selected[0].text, "제목（1） 설명");
   assert.equal(selected[1].kind, "ip");
   const next = value.slice(0, selected[0].start) + value.slice(selected[0].start + selected[0].token.length);
   assert.equal(selectedMentions(next)[0].token, second);
+  assert.equal(selectedMentions("@[漏洞#12 기존 기록]")[0].kind, "finding");
 });

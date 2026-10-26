@@ -12,7 +12,7 @@ export const DEFAULT_LOCALE: Locale = "ko";
 export const LOCALE_LABELS: Record<Locale, string> = {
   en: "English",
   ko: "한국어",
-  zh: "中文",
+  zh: "중국어",
   es: "Español",
 };
 
