@@ -3218,6 +3218,24 @@
     }
   },
   "llmPage": {
+    "chatGPT": {
+      "title": "ChatGPT plan",
+      "description": "Connect your ChatGPT account to choose eligible models without an API key.",
+      "connect": "Continue with ChatGPT",
+      "manageUsage": "Using ChatGPT plan · Manage usage",
+      "disconnect": "Disconnect",
+      "connectedAs": "Using the ChatGPT plan for {email}",
+      "connectFirst": "Connect your ChatGPT account first",
+      "connectedToast": "ChatGPT account connected",
+      "deniedToast": "ChatGPT connection canceled",
+      "noPlanToast": "ChatGPT plan access was not granted",
+      "errorToast": "ChatGPT connection failed",
+      "disconnectedToast": "ChatGPT account disconnected",
+      "revocationWarning": "Local access was removed, but remote revocation could not be confirmed",
+      "cardCreateFailed": "Could not create the ChatGPT model card",
+      "daybreakLabel": "Daybreak Blue",
+      "daybreakHint": "For approved security work. Requests fail if the model or account lacks access."
+    },
     "page": {
       "subtitle": "Format / model / rate-limit settings shared by all agents. Click a card to edit; the star marks the active profile.",
       "poolConfig": "Rotation settings",

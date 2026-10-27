@@ -957,6 +957,7 @@ export const api = {
     profile_id?: number,
     streaming = true, // 用该配置真实的收发模式来测，别让"流式能通、非流式不通"漏到会话里
     session_header_key = "", // 非空=测试请求也带该自定义会话头（值为一次性 session id）
+    daybreak_enabled = false,
   ) =>
     // reply = 模型实际回复(已截断);一个字都不回的配置后端直接判失败
     post<{ ok: boolean; error?: string; latency_ms?: number; model?: string; reply?: string }>("/llm/test", {
@@ -970,8 +971,13 @@ export const api = {
       profile_id,
       streaming,
       session_header_key,
+      daybreak_enabled,
     }),
   llmProfiles: () => get<{ profiles: LLMProfile[] }>("/llm/profiles").then((r) => arr(r.profiles)),
+  chatGPTStatus: () => get<{ connected: boolean; plan_enabled: boolean; email: string }>("/llm/chatgpt/status"),
+  chatGPTStart: (return_to: string) => post<{ authorize_url: string }>("/llm/chatgpt/start", { return_to }),
+  chatGPTDisconnect: () => post<{ disconnected: boolean; remote_revoked: boolean }>("/llm/chatgpt/disconnect", {}),
+  chatGPTEnsureProfile: () => post<{ id: number; model: string; created: boolean }>("/llm/chatgpt/ensure-profile", {}),
   saveLLMProfile: (p: {
     id?: number; // omit/0 = create; set = update that profile
     name: string;
@@ -988,6 +994,7 @@ export const api = {
     priority?: number; // 轮询顺位，越大越先用
     pool_exclude?: boolean; // true=不作为故障转移目标
     streaming?: boolean; // true(默认)=流式 | false=非流式
+    daybreak_enabled?: boolean;
     max_tokens?: number; // 单次回复输出上限；0=不发送，由服务端默认值决定
     max_tokens_field?: string; // ""=max_tokens(默认) | "max_completion_tokens"（仅 openai 格式）
     session_header_key?: string; // 非空=每次请求带该 HTTP 头，头值=当前会话 session id；""=不发送

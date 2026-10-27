@@ -1875,6 +1875,22 @@ func (s *Server) pgSaveProfile(w http.ResponseWriter, r *http.Request) {
 	p := body.LLMProfile
 	p.APIKey = body.APIKey
 	p.Streaming = body.Streaming == nil || *body.Streaming
+	if p.Format == "chatgpt-oauth" {
+		if s.chatGPTAuth == nil || !s.chatGPTAuth.available() {
+			writeErr(w, 400, "ChatGPT 계정을 먼저 연결해 주세요")
+			return
+		}
+		p.APIKey = db.ChatGPTProfileKey
+		p.BaseURL = chatGPTAPIBase
+		p.Streaming = true
+		p.MaxTokens = 0
+	} else if p.ID != 0 && p.APIKey == "" {
+		// An OAuth marker must never become a static API key after changing format.
+		if old, _ := pg.ProfileByID(p.ID); old != nil && old.Format == "chatgpt-oauth" {
+			writeErr(w, 400, "새 제공자의 API Key를 입력해 주세요")
+			return
+		}
+	}
 	// 输出上限:负数无意义,归零(= 不发送该字段)。字段名开关只有 Chat Completions
 	// 用得上——anthropic 与 openai-responses 各自定死了字段名,存下来只会误导后续读者,
 	// 故非 openai 格式一律清空。未知取值同样清空,避免把 DB CHECK 的报错甩给用户。
@@ -2052,6 +2068,10 @@ func (s *Server) pgListModels(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := decode(r, &req); err != nil {
 		writeErr(w, 400, err.Error())
+		return
+	}
+	if req.Provider == "chatgpt-oauth" {
+		s.chatGPTModels(w, r)
 		return
 	}
 	// Resolve API key: form input > profile stored key.

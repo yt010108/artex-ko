@@ -3218,6 +3218,24 @@
     }
   },
   "llmPage": {
+    "chatGPT": {
+      "title": "ChatGPT 套餐",
+      "description": "连接 ChatGPT 账户后，无需 API Key 即可选择可用模型。",
+      "connect": "使用 ChatGPT 继续",
+      "manageUsage": "正在使用 ChatGPT 套餐 · 管理用量",
+      "disconnect": "断开连接",
+      "connectedAs": "正在使用 {email} 的 ChatGPT 套餐",
+      "connectFirst": "请先连接 ChatGPT 账户",
+      "connectedToast": "ChatGPT 账户已连接",
+      "deniedToast": "已取消 ChatGPT 连接",
+      "noPlanToast": "未授予 ChatGPT 套餐使用权限",
+      "errorToast": "ChatGPT 连接失败",
+      "disconnectedToast": "已断开 ChatGPT 账户",
+      "revocationWarning": "本地连接已移除，但无法确认远程撤销",
+      "cardCreateFailed": "无法创建 ChatGPT 模型卡片",
+      "daybreakLabel": "Daybreak Blue",
+      "daybreakHint": "仅用于获批的安全工作。模型或账户未获授权时请求会失败。"
+    },
     "page": {
       "subtitle": "全 Agent 共享的格式 / 模型 / 限速配置。点击卡片编辑，星标为当前激活配置。",
       "poolConfig": "轮询配置",

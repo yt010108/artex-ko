@@ -96,7 +96,7 @@ ARTEX 는 **자신이 소유하거나 서면으로 명시적 허가를 받은 �
 
 ## 빠른 시작 (Docker Compose)
 
-> **사전 요구:** Docker 와 Docker Compose. 데이터베이스는 **PostgreSQL** 이며 compose 가 함께 띄웁니다. 탐색에는 **LLM** 이 필요합니다(`ANTHROPIC_API_KEY` 또는 `OPENAI_API_KEY`, UI 에서도 설정 가능).
+> **사전 요구:** Docker 와 Docker Compose. 데이터베이스는 **PostgreSQL** 이며 compose 가 함께 띄웁니다. 탐색에는 **LLM** 이 필요합니다(API Key 또는 아래 ChatGPT 계정 연결).
 
 > **이미지:** `docker-compose.yml` 의 `artex` 서비스는 이 저장소가 릴리스 태그(`v*`)마다 GitHub Container Registry 에 발행하는 한국어판 이미지 `ghcr.io/jiwoochris/artex-ko` 를 받습니다. 기본 태그는 `latest`(가장 최근 릴리스)이고, `.env` 의 `ARTEX_TAG` 로 특정 릴리스에 고정할 수 있습니다. 원본 저장소의 이미지 `autumn27/artex` 는 Docker Hub 에서 내려가 더는 쓰지 않습니다.
 
@@ -146,6 +146,8 @@ docker compose up -d          # artex 이미지 + postgres 를 함께 기동
 ```
 
 **LLM:** `export ANTHROPIC_API_KEY=sk-...`(또는 `OPENAI_API_KEY`), 혹은 UI 의 "LLM 설정" 페이지에서 입력합니다. 선택 환경 변수로 `ARTEX_LLM_PROVIDER` / `ARTEX_LLM_MODEL` / `ARTEX_LLM_BASE_URL` / `ARTEX_LLM_PROXY` 를 둘 수 있습니다. 국산·오픈 모델을 쓰려면 OpenAI 호환 `ARTEX_LLM_BASE_URL` 을 지정하십시오.
+
+ChatGPT 플랜을 쓰려면 같은 컴퓨터의 `http://127.0.0.1:8787`(Docker 호스트 포트를 바꿨다면 그 포트)로 접속해 "LLM 설정" → "ChatGPT로 계속"을 누르십시오. 연결 후 새 모델 설정의 형식을 `ChatGPT OAuth`로 선택하고, 모델 목록에서 계정에 허용된 모델을 골라 테스트·저장·활성화합니다. 계정의 사용 권한이 승인되어야 하며, OAuth 연결 정보는 브라우저가 아닌 로컬 PostgreSQL에 저장됩니다. 이 경로는 [OpenAI의 오픈 소스 앱 안내](https://developers.openai.com/siwc/token-sharing-open-source)에 따른 Responses API 스트리밍을 사용합니다.
 
 **동시성:** 작업마다 돌리는 worker 에이전트 수는 "시스템 설정"에서 조정합니다(기본값 3).
 

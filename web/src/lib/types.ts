@@ -1029,7 +1029,7 @@ export interface NotificationDelivery {
 export interface LLMProfile {
   id: string;
   name: string;
-  format: "openai" | "anthropic" | "openai-responses";
+  format: "openai" | "anthropic" | "openai-responses" | "chatgpt-oauth";
   base_url?: string;
   proxy?: string;
   model: string;
@@ -1048,6 +1048,7 @@ export interface LLMProfile {
   pool_exclude?: boolean;
   // true（默认）= 流式(SSE) | false = 真·非流式(stream:false，一次性返回)。
   streaming?: boolean;
+  daybreak_enabled?: boolean;
   // 单次回复的输出上限(token)。0 = 不发送该字段，由服务端默认值决定。
   // 注意与 context_window_k 区分：后者是模型总容量，只在本地用于压缩阈值。
   max_tokens?: number;

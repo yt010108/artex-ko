@@ -3218,6 +3218,24 @@
     }
   },
   "llmPage": {
+    "chatGPT": {
+      "title": "ChatGPT 플랜",
+      "description": "ChatGPT 계정을 연결하면 API Key 없이 사용 가능한 모델을 선택할 수 있습니다.",
+      "connect": "ChatGPT로 계속",
+      "manageUsage": "ChatGPT 플랜 사용 중 · 사용량 관리",
+      "disconnect": "연결 해제",
+      "connectedAs": "{email} 계정의 ChatGPT 플랜 사용 중",
+      "connectFirst": "먼저 ChatGPT 계정을 연결해 주세요",
+      "connectedToast": "ChatGPT 계정이 연결되었습니다",
+      "deniedToast": "ChatGPT 연결이 취소되었습니다",
+      "noPlanToast": "ChatGPT 플랜 사용 권한이 승인되지 않았습니다",
+      "errorToast": "ChatGPT 연결에 실패했습니다",
+      "disconnectedToast": "ChatGPT 연결을 해제했습니다",
+      "revocationWarning": "로컬 연결은 해제됐지만 OpenAI 측 해제는 확인되지 않았습니다",
+      "cardCreateFailed": "ChatGPT 모델 카드를 만들지 못했습니다",
+      "daybreakLabel": "Daybreak Blue",
+      "daybreakHint": "승인된 계정의 보안 작업에 사용합니다. 지원하지 않는 모델이나 권한이면 요청이 실패합니다."
+    },
     "page": {
       "subtitle": "모든 에이전트가 공유하는 형식 / 모델 / 속도 제한 설정입니다. 카드를 클릭하면 편집하고, 별표는 현재 활성 설정입니다.",
       "poolConfig": "순환 설정",

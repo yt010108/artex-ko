@@ -3218,6 +3218,24 @@
     }
   },
   "llmPage": {
+    "chatGPT": {
+      "title": "Plan de ChatGPT",
+      "description": "Conecta tu cuenta de ChatGPT para elegir modelos disponibles sin clave de API.",
+      "connect": "Continuar con ChatGPT",
+      "manageUsage": "Usando el plan de ChatGPT · Gestionar uso",
+      "disconnect": "Desconectar",
+      "connectedAs": "Usando el plan de ChatGPT de {email}",
+      "connectFirst": "Conecta primero tu cuenta de ChatGPT",
+      "connectedToast": "Cuenta de ChatGPT conectada",
+      "deniedToast": "Conexión de ChatGPT cancelada",
+      "noPlanToast": "No se concedió acceso al plan de ChatGPT",
+      "errorToast": "Falló la conexión de ChatGPT",
+      "disconnectedToast": "Cuenta de ChatGPT desconectada",
+      "revocationWarning": "Se eliminó el acceso local, pero no se pudo confirmar la revocación remota",
+      "cardCreateFailed": "No se pudo crear la tarjeta del modelo de ChatGPT",
+      "daybreakLabel": "Daybreak Blue",
+      "daybreakHint": "Para trabajo de seguridad aprobado. La solicitud falla si el modelo o la cuenta no tienen acceso."
+    },
     "page": {
       "subtitle": "Configuración de formato / modelo / límite de velocidad compartida por todos los agentes. Haga clic en una tarjeta para editarla; la estrella indica el perfil activo.",
       "poolConfig": "Configuración de rotación",

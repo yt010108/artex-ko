@@ -251,16 +251,18 @@ function ProfileSheet({
   open,
   onOpenChange,
   onSaved,
+  chatGPTStatus,
 }: {
   profile: LLMProfile | null; // null = 新建
   open: boolean;
   onOpenChange: (o: boolean) => void;
   onSaved: (id: string) => void;
+  chatGPTStatus: { connected: boolean; plan_enabled: boolean; email: string } | null;
 }) {
   const t = useTranslations("llmPage");
   const isNew = !profile;
   const [name, setName] = React.useState("");
-  const [format, setFormat] = React.useState<"anthropic" | "openai" | "openai-responses">("anthropic");
+  const [format, setFormat] = React.useState<LLMProfile["format"]>("anthropic");
   const [model, setModel] = React.useState("");
   const [baseUrl, setBaseUrl] = React.useState("");
   const [proxy, setProxy] = React.useState("");
@@ -274,6 +276,7 @@ function ProfileSheet({
   const [priority, setPriority] = React.useState("0"); // 轮询顺位;越大越先
   const [poolExclude, setPoolExclude] = React.useState(false);
   const [streaming, setStreaming] = React.useState(true); // true=流式(默认);false=非流式
+  const [daybreak, setDaybreak] = React.useState(false);
   const [maxTokens, setMaxTokens] = React.useState("0"); // 单次回复输出上限;0=不发送
   const [maxTokensField, setMaxTokensField] = React.useState(NONE); // 上限用哪个字段名;NONE=max_tokens
   const [sessionHeaderKey, setSessionHeaderKey] = React.useState(""); // 自定义会话头名;空=不发送
@@ -308,7 +311,7 @@ function ProfileSheet({
   React.useEffect(() => {
     if (!open) return;
     setName(profile?.name ?? "");
-    setFormat(profile?.format === "openai" || profile?.format === "openai-responses" ? profile.format : "anthropic");
+    setFormat(profile?.format ?? "anthropic");
     setModel(profile?.model ?? "");
     setBaseUrl(profile?.base_url ?? "");
     setProxy(profile?.proxy ?? "");
@@ -320,6 +323,7 @@ function ProfileSheet({
     setPriority(String(profile?.priority ?? 0));
     setPoolExclude(profile?.pool_exclude ?? false);
     setStreaming(profile?.streaming ?? true);
+    setDaybreak(profile?.daybreak_enabled ?? false);
     setMaxTokens(String(profile?.max_tokens ?? 0));
     setMaxTokensField(fromStore(profile?.max_tokens_field));
     setSessionHeaderKey(profile?.session_header_key ?? "");
@@ -369,6 +373,7 @@ function ProfileSheet({
         profileId,
         streaming,
         sessionHeaderKey.trim(),
+        format === "chatgpt-oauth" && daybreak,
       );
       // 回复内容一并展示：看得见模型确实说了话，才算和会话里跑通是一回事。
       if (r.ok)
@@ -386,6 +391,10 @@ function ProfileSheet({
   async function save() {
     if (!name.trim() || !model.trim()) {
       toast.error(t("profile.toast.nameModelRequired"));
+      return;
+    }
+    if (format === "chatgpt-oauth" && !chatGPTStatus?.plan_enabled) {
+      toast.error(t("chatGPT.connectFirst"));
       return;
     }
     if (saving) return;
@@ -407,6 +416,7 @@ function ProfileSheet({
         priority: Number(priority) || 0,
         pool_exclude: poolExclude,
         streaming,
+        daybreak_enabled: format === "chatgpt-oauth" && daybreak,
         max_tokens: Math.max(0, Number(maxTokens) || 0),
         // 字段名开关只对 openai(Chat Completions) 有意义，其它格式一律回落到默认；
         // 后端也会再做一次同样的归一化，这里只是别让 UI 送出自相矛盾的值。
@@ -456,7 +466,18 @@ function ProfileSheet({
             </div>
             <div className="grid gap-2">
               <Label>{t("profile.format.label")}</Label>
-              <Select value={format} onValueChange={(v) => setFormat(v as "anthropic" | "openai" | "openai-responses")}>
+              <Select value={format} onValueChange={(v) => {
+                const next = v as LLMProfile["format"];
+                setFormat(next);
+                if (next === "chatgpt-oauth") {
+                  setBaseUrl("https://api.openai.com/v1");
+                  setApiKey("");
+                  setStreaming(true);
+                  setMaxTokens("0");
+                } else {
+                  setDaybreak(false);
+                }
+              }}>
                 <SelectTrigger>
                   <SelectValue placeholder={t("profile.format.placeholder")} />
                 </SelectTrigger>
@@ -464,10 +485,19 @@ function ProfileSheet({
                   <SelectItem value="anthropic">Anthropic</SelectItem>
                   <SelectItem value="openai">OpenAI (Chat Completions)</SelectItem>
                   <SelectItem value="openai-responses">OpenAI (Responses API)</SelectItem>
+                  <SelectItem value="chatgpt-oauth">ChatGPT OAuth</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
+
+          {format === "chatgpt-oauth" && (
+            <div className="rounded-lg border p-3 text-sm">
+              {chatGPTStatus?.plan_enabled
+                ? t("chatGPT.connectedAs", { email: chatGPTStatus.email || "ChatGPT" })
+                : t("chatGPT.connectFirst")}
+            </div>
+          )}
 
           <div className="grid gap-2">
             <Label htmlFor="p-model">{t("profile.model.label")}</Label>
@@ -475,7 +505,7 @@ function ProfileSheet({
               <Input
                 id="p-model"
                 className="font-mono"
-                placeholder="claude-opus-4-8"
+                placeholder={format === "chatgpt-oauth" ? t("profile.model.label") : "claude-opus-4-8"}
                 value={model}
                 onChange={(e) => setModel(e.target.value)}
               />
@@ -516,7 +546,7 @@ function ProfileSheet({
             </div>
           </div>
 
-          <div className="grid gap-2">
+          {format !== "chatgpt-oauth" && <div className="grid gap-2">
             <Label htmlFor="p-base-url">{t("profile.baseUrl.label")}</Label>
             <Input
               id="p-base-url"
@@ -525,7 +555,7 @@ function ProfileSheet({
               value={baseUrl}
               onChange={(e) => setBaseUrl(e.target.value)}
             />
-          </div>
+          </div>}
 
           <div className="grid gap-2">
             <Label htmlFor="p-proxy">{t("profile.proxy.label")}</Label>
@@ -553,7 +583,7 @@ function ProfileSheet({
             </p>
           </div>
 
-          <div className="grid gap-2">
+          {format !== "chatgpt-oauth" && <div className="grid gap-2">
             <Label htmlFor="p-api-key">API Key</Label>
             <Input
               id="p-api-key"
@@ -562,7 +592,7 @@ function ProfileSheet({
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
             />
-          </div>
+          </div>}
 
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="grid gap-2">
@@ -587,6 +617,16 @@ function ProfileSheet({
             </div>
           </div>
           <p className="-mt-2 text-muted-foreground text-xs">{t("profile.rateHint")}</p>
+
+          {format === "chatgpt-oauth" && (
+            <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
+              <div className="grid gap-0.5">
+                <Label htmlFor="p-daybreak">{t("chatGPT.daybreakLabel")}</Label>
+                <p className="text-muted-foreground text-xs">{t("chatGPT.daybreakHint")}</p>
+              </div>
+              <Switch id="p-daybreak" checked={daybreak} onCheckedChange={setDaybreak} />
+            </div>
+          )}
 
           <div className="grid gap-3 rounded-lg border p-3">
             <div className="flex items-center justify-between gap-4">
@@ -616,11 +656,11 @@ function ProfileSheet({
                 <Label className="text-sm">{t("profile.streaming.label")}</Label>
                 <p className="text-muted-foreground text-xs">{t("profile.streaming.hint")}</p>
               </div>
-              <Switch checked={streaming} onCheckedChange={setStreaming} aria-label={t("profile.streaming.aria")} />
+              <Switch checked={streaming} onCheckedChange={setStreaming} disabled={format === "chatgpt-oauth"} aria-label={t("profile.streaming.aria")} />
             </div>
           </div>
 
-          <div className="grid gap-3 rounded-lg border p-3">
+          {format !== "chatgpt-oauth" && <div className="grid gap-3 rounded-lg border p-3">
             <div className="flex items-center justify-between gap-4">
               <div className="grid gap-0.5">
                 <Label htmlFor="p-max-tokens" className="text-sm">
@@ -660,7 +700,7 @@ function ProfileSheet({
                 </SelectContent>
               </Select>
             </div>
-          </div>
+          </div>}
 
           <div className="grid gap-3 rounded-lg border p-3">
             <div className="flex items-center justify-between gap-4">
@@ -725,6 +765,9 @@ function ProfileSheet({
 export default function LLMPage() {
   const t = useTranslations("llmPage");
   const [profiles, setProfiles] = React.useState<LLMProfile[]>([]);
+  const [chatGPTStatus, setChatGPTStatus] = React.useState<{ connected: boolean; plan_enabled: boolean; email: string } | null>(null);
+  const [chatGPTBusy, setChatGPTBusy] = React.useState(false);
+  const autoProfileAttempted = React.useRef(false);
   const [pool, setPool] = React.useState<LLMPoolStatus | null>(null);
   const [poolOpen, setPoolOpen] = React.useState(false);
   // 抽屉的开关和内容分开存：关闭时 editing 保持不变，否则关闭动画期间标题会从
@@ -739,6 +782,9 @@ export default function LLMPage() {
   // 一个配置在卡片上显示的「是否正常」。没填 Key 的配置根本发不出请求，比熔断更该先说。
   const healthOf = React.useCallback(
     (p: LLMProfile, m?: LLMPoolMember): Health => {
+      if (p.format === "chatgpt-oauth" && !chatGPTStatus?.plan_enabled) {
+        return { label: t("health.noKey.label"), cls: "border-muted-foreground/40 text-muted-foreground", hint: t("chatGPT.connectFirst") };
+      }
       if (!p.api_key_hint) {
         return {
           label: t("health.noKey.label"),
@@ -765,7 +811,7 @@ export default function LLMPage() {
       }
       return { label: t("health.ok"), cls: "border-emerald-500/50 text-emerald-600 dark:text-emerald-400" };
     },
-    [t],
+    [t, chatGPTStatus],
   );
 
   const loadPool = React.useCallback(async () => {
@@ -777,17 +823,74 @@ export default function LLMPage() {
   }, []);
 
   const load = React.useCallback(async () => {
+    let currentProfiles: LLMProfile[] | null = null;
     try {
-      setProfiles(await api.llmProfiles());
+      currentProfiles = await api.llmProfiles();
     } catch {
       /* ignore */
     }
+    try {
+      const status = await api.chatGPTStatus();
+      setChatGPTStatus(status);
+      if (status.plan_enabled && currentProfiles && !currentProfiles.some((p) => p.format === "chatgpt-oauth") && !autoProfileAttempted.current) {
+        autoProfileAttempted.current = true;
+        try {
+          await api.chatGPTEnsureProfile();
+          currentProfiles = await api.llmProfiles();
+        } catch (e) {
+          toast.error(t("chatGPT.cardCreateFailed"), { description: (e as Error).message });
+        }
+      }
+    } catch {
+      setChatGPTStatus(null);
+    }
+    if (currentProfiles) setProfiles(currentProfiles);
     await loadPool();
-  }, [loadPool]);
+  }, [loadPool, t]);
 
   React.useEffect(() => {
     void load();
   }, [load]);
+
+  React.useEffect(() => {
+    const url = new URL(window.location.href);
+    const result = url.searchParams.get("chatgpt");
+    if (!result) return;
+    url.searchParams.delete("chatgpt");
+    window.history.replaceState(null, "", url.pathname + url.search);
+    if (result === "connected") toast.success(t("chatGPT.connectedToast"));
+    else if (result === "denied") toast.error(t("chatGPT.deniedToast"));
+    else if (result === "no-plan") toast.error(t("chatGPT.noPlanToast"));
+    else toast.error(t("chatGPT.errorToast"));
+    void load();
+  }, [load, t]);
+
+  async function connectChatGPT() {
+    if (chatGPTBusy) return;
+    setChatGPTBusy(true);
+    try {
+      const { authorize_url } = await api.chatGPTStart(window.location.origin);
+      window.location.assign(authorize_url);
+    } catch (e) {
+      toast.error(t("chatGPT.errorToast"), { description: (e as Error).message });
+      setChatGPTBusy(false);
+    }
+  }
+
+  async function disconnectChatGPT() {
+    if (chatGPTBusy) return;
+    setChatGPTBusy(true);
+    try {
+      const result = await api.chatGPTDisconnect();
+      toast.success(t("chatGPT.disconnectedToast"));
+      if (!result.remote_revoked) toast.warning(t("chatGPT.revocationWarning"));
+      await load();
+    } catch (e) {
+      toast.error(t("chatGPT.errorToast"), { description: (e as Error).message });
+    } finally {
+      setChatGPTBusy(false);
+    }
+  }
 
   // 卡片上的健康徽章按 profile id 取轮询状态。
   const health = React.useMemo(() => {
@@ -844,6 +947,30 @@ export default function LLMPage() {
         </div>
       </div>
 
+      <Card className="gap-0 py-4">
+        <CardContent className="flex flex-wrap items-center justify-between gap-3 px-4">
+          <div className="grid gap-1">
+            <span className="font-medium text-sm">{t("chatGPT.title")}</span>
+            <span className="text-muted-foreground text-xs">
+              {chatGPTStatus?.plan_enabled
+                ? t("chatGPT.connectedAs", { email: chatGPTStatus.email || "ChatGPT" })
+                : chatGPTStatus?.connected ? t("chatGPT.noPlanToast") : t("chatGPT.description")}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            {chatGPTStatus?.connected && (
+              <Button size="sm" variant="outline" disabled={chatGPTBusy} onClick={() => void disconnectChatGPT()}>
+                {t("chatGPT.disconnect")}
+              </Button>
+            )}
+            <Button size="sm" disabled={chatGPTBusy} onClick={() => void connectChatGPT()}>
+              {chatGPTBusy && <Loader2Icon className="animate-spin" />}
+              {t("chatGPT.connect")}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       <Tabs defaultValue="profiles" className="flex-1">
         <TabsList>
           <TabsTrigger value="profiles">{t("page.tab.profiles")}</TabsTrigger>
@@ -886,6 +1013,7 @@ export default function LLMPage() {
                           <Badge variant="outline" className="uppercase">
                             {p.format}
                           </Badge>
+                          {p.daybreak_enabled && <Badge variant="outline">Daybreak Blue</Badge>}
                           <Badge variant="outline" className={cn("ml-auto", h.cls)} title={h.hint}>
                             {h.label}
                           </Badge>
@@ -959,7 +1087,7 @@ export default function LLMPage() {
         </TabsContent>
       </Tabs>
 
-      <ProfileSheet profile={editing} open={editOpen} onOpenChange={setEditOpen} onSaved={() => void load()} />
+      <ProfileSheet profile={editing} open={editOpen} onOpenChange={setEditOpen} onSaved={() => void load()} chatGPTStatus={chatGPTStatus} />
       <PoolSheet open={poolOpen} onOpenChange={setPoolOpen} pool={pool} onReload={loadPool} />
     </div>
   );

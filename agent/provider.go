@@ -34,6 +34,10 @@ type Config struct {
 	BaseURL string
 	APIKey  string
 	Model   string
+	// ChatGPT uses a renewable OAuth token instead of a static API key.
+	ChatGPT       bool
+	ChatGPTTokens ChatGPTTokenSource
+	Daybreak      bool
 	// Proxy routes all LLM requests through the given proxy URL (http/https/socks5,
 	// optionally with user:pass@ credentials). Empty means direct — it does NOT
 	// fall back to the standard *_PROXY environment variables.
@@ -211,12 +215,16 @@ func ConfigFrom(provider, model, baseURL, apiKey, proxy string) Config {
 		if c.Model == "" {
 			c.Model = "gpt-4o"
 		}
-	case "openai-responses":
+	case "openai-responses", "chatgpt-oauth":
 		c.Format = llm.FormatOpenAIResponses
 		// provider appends "/responses"; tolerate a full endpoint URL.
 		c.BaseURL = strings.TrimRight(strings.TrimSuffix(c.BaseURL, "/responses"), "/")
 		if c.Model == "" {
 			c.Model = "gpt-5"
+		}
+		if strings.TrimSpace(provider) == "chatgpt-oauth" {
+			c.ChatGPT = true
+			c.BaseURL = "https://api.openai.com/v1"
 		}
 	default:
 		c.Format = llm.FormatAnthropic
@@ -241,6 +249,9 @@ func isFalsy(s string) bool {
 
 // Provider returns the short provider name ("anthropic"/"openai").
 func (c Config) Provider() string {
+	if c.ChatGPT {
+		return "chatgpt-oauth"
+	}
 	switch c.Format {
 	case llm.FormatOpenAI:
 		return "openai"
@@ -257,6 +268,15 @@ func (c Config) NewProvider() (llm.Provider, error) {
 	client, err := quotaAwareHTTPClient(c.Proxy, c.SessionHeaderKey)
 	if err != nil {
 		return nil, err
+	}
+	if c.ChatGPT {
+		if c.ChatGPTTokens == nil {
+			return nil, fmt.Errorf("ChatGPT 계정이 연결되지 않았습니다")
+		}
+		if !c.Stream {
+			return nil, fmt.Errorf("ChatGPT 플랜은 스트리밍 요청만 지원합니다")
+		}
+		client.Transport = chatGPTPlanTransport{base: client.Transport, tokens: c.ChatGPTTokens, daybreak: c.Daybreak}
 	}
 	lc := llm.Config{
 		Format:     c.Format,
@@ -303,7 +323,7 @@ func IsQuotaExhaustedMessage(message string) bool {
 		return false
 	}
 	markers := []string{
-		"insufficient_quota", "quota_exceeded", "quota exceeded", "quota exhausted",
+		"insufficient_quota", "quota_exceeded", "quota exceeded", "quota exhausted", "subscription_sharing_usage_limit_exceeded",
 		"exceeded your current quota", "billing_hard_limit_reached",
 		"billing hard limit", "billing_not_active", "credit balance", "insufficient credit",
 		"insufficient balance", "balance is too low", "payment required", "status 402",

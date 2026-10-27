@@ -306,6 +306,7 @@ function LLMProfileRow({
   rightSlot?: React.ReactNode;
 }) {
   const t = useTranslations("chat");
+  const tLLM = useTranslations("llmPage");
   const [open, setOpen] = React.useState(false);
   const activeDefault = profiles.find((p) => p.is_default);
   const current = selected != null ? profiles.find((p) => Number(p.id) === selected) : null;
@@ -313,6 +314,7 @@ function LLMProfileRow({
     ? t("llmProfile.defaultNamed", { name: activeDefault.name })
     : t("llmProfile.default");
   const label = current ? current.name : defaultLabel;
+  const usesChatGPT = (current ?? activeDefault)?.format === "chatgpt-oauth";
 
   return (
     <div className="flex min-w-0 shrink-0 items-center gap-1 px-1 pt-0.5 pb-1">
@@ -320,6 +322,11 @@ function LLMProfileRow({
       <span className="truncate text-muted-foreground/70 text-xs" title={label}>
         {label}
       </span>
+      {usesChatGPT && (
+        <a href="https://chatgpt.com/settings/usage" target="_blank" rel="noreferrer" className="shrink-0 text-primary text-xs hover:underline">
+          {tLLM("chatGPT.manageUsage")}
+        </a>
+      )}
       <Popover open={open} onOpenChange={disabled ? undefined : setOpen}>
         <PopoverTrigger asChild>
           <button

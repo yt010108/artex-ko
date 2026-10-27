@@ -109,9 +109,11 @@ const (
 // Server exposes the ARTEX backend over a JSON HTTP API for the shadcn/ui
 // frontend.
 type Server struct {
-	m      *Manager
-	engine *Engine
-	ctx    context.Context
+	m                *Manager
+	engine           *Engine
+	ctx              context.Context
+	chatGPTAuth      *chatGPTAuth
+	chatGPTProfileMu sync.Mutex
 
 	skillDir string // root directory for skill subdirectories
 	jwtKey   []byte // HS256 signing key loaded from / generated into dataDir/jwt.key
@@ -236,6 +238,7 @@ func New(ctx context.Context, m *Manager, skillDir string, dataDir string, keyDi
 		profChatAgents: map[int64]*agent.ChatAgent{},
 		provByProfile:  map[int64]*provEntry{}, llmHealth: newLLMHealthRegistry(m.pg),
 		taskAgents: map[string]*taskAgentBundle{}, archiveWake: make(chan struct{}, 1)}
+	s.chatGPTAuth = newChatGPTAuth(m.pg)
 	// First-run protection: cache the password hash and, while none is set, issue
 	// the console setup token (or apply ARTEX_ADMIN_PASSWORD) before any request.
 	s.bootstrapAuth()
@@ -442,9 +445,13 @@ func (s *Server) loadLLMConfig() (agent.Config, bool) {
 	cfg.ThinkingType = p.ThinkingType
 	cfg.ReasoningEffort = p.ReasoningEffort
 	cfg.Stream = p.Streaming
+	cfg.Daybreak = p.Daybreak
 	cfg.MaxTokens, cfg.MaxTokensField = p.MaxTokens, p.MaxTokensField
 	cfg.SessionHeaderKey = p.SessionHeaderKey
 	s.applyProfileRetry(&cfg, p)
+	if !s.attachChatGPTAuth(&cfg) {
+		return cfg, false
+	}
 	if cfg.APIKey == "" {
 		return cfg, false
 	}
@@ -485,7 +492,7 @@ func (s *Server) saveLLMConfig(cfg agent.Config) error {
 		ID: id, Name: "default", Format: format, Model: cfg.Model, BaseURL: cfg.BaseURL, Proxy: cfg.Proxy,
 		APIKey: cfg.APIKey, RatePerSecond: cfg.RatePerSecond, RatePerMinute: cfg.RatePerMinute,
 		ContextWindowK: cfg.ContextWindowK, ThinkingType: cfg.ThinkingType, ReasoningEffort: cfg.ReasoningEffort, IsDefault: true,
-		Priority: priority, PoolExclude: poolExclude, Streaming: streaming,
+		Priority: priority, PoolExclude: poolExclude, Streaming: streaming, Daybreak: cfg.Daybreak,
 		MaxTokens: maxTokens, MaxTokensField: maxTokensField, SessionHeaderKey: sessionHeaderKey,
 		Retry: retry,
 	})
@@ -613,9 +620,13 @@ func (s *Server) loadProfileConfig(id int64) (agent.Config, bool) {
 	cfg.ThinkingType = p.ThinkingType
 	cfg.ReasoningEffort = p.ReasoningEffort
 	cfg.Stream = p.Streaming
+	cfg.Daybreak = p.Daybreak
 	cfg.MaxTokens, cfg.MaxTokensField = p.MaxTokens, p.MaxTokensField
 	cfg.SessionHeaderKey = p.SessionHeaderKey
 	s.applyProfileRetry(&cfg, p)
+	if !s.attachChatGPTAuth(&cfg) {
+		return cfg, false
+	}
 	if cfg.APIKey == "" {
 		return cfg, false
 	}
@@ -767,6 +778,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/auth/init", s.authInit)
 	mux.HandleFunc("POST /api/auth/login", s.authLogin)
 	mux.HandleFunc("POST /api/auth/change-password", s.authChangePassword)
+	mux.HandleFunc("GET /api/auth/chatgpt/callback", s.chatGPTCallback)
 
 	mux.HandleFunc("GET /api/health", s.health)
 	mux.HandleFunc("GET /api/stats", s.stats)
@@ -848,6 +860,11 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/llm", s.getLLM)
 	mux.HandleFunc("POST /api/llm", s.setLLM)
 	mux.HandleFunc("POST /api/llm/test", s.testLLM)
+	mux.HandleFunc("GET /api/llm/chatgpt/status", s.chatGPTStatus)
+	mux.HandleFunc("POST /api/llm/chatgpt/start", s.chatGPTStart)
+	mux.HandleFunc("POST /api/llm/chatgpt/disconnect", s.chatGPTDisconnect)
+	mux.HandleFunc("GET /api/llm/chatgpt/models", s.chatGPTModels)
+	mux.HandleFunc("POST /api/llm/chatgpt/ensure-profile", s.chatGPTEnsureProfile)
 
 	// asset system
 	mux.HandleFunc("GET /api/assets", s.listAssets)
@@ -1426,15 +1443,21 @@ func (s *Server) setLLM(w http.ResponseWriter, r *http.Request) {
 		ContextWindowK  int     `json:"context_window_k"`
 		ThinkingType    string  `json:"thinking_type"`
 		ReasoningEffort string  `json:"reasoning_effort"`
+		Daybreak        bool    `json:"daybreak_enabled"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeErr(w, 400, err.Error())
 		return
 	}
 	cfg := agent.ConfigFrom(req.Provider, req.Model, req.BaseURL, req.APIKey, req.Proxy)
+	if cfg.ChatGPT && !s.attachChatGPTAuth(&cfg) {
+		writeErr(w, 400, "ChatGPT 계정을 먼저 연결해 주세요")
+		return
+	}
 	cfg.RatePerSecond, cfg.RatePerMinute = req.RatePerSecond, req.RatePerMinute
 	cfg.ThinkingType = req.ThinkingType
 	cfg.ReasoningEffort = req.ReasoningEffort
+	cfg.Daybreak = cfg.ChatGPT && req.Daybreak
 	if k := req.ContextWindowK; k > 0 { // 0 = keep default (200K); cap at 1M
 		if k > 1000 {
 			k = 1000
@@ -1482,6 +1505,7 @@ func (s *Server) testLLM(w http.ResponseWriter, r *http.Request) {
 		APIKey           string `json:"api_key"`
 		ThinkingType     string `json:"thinking_type"`
 		ReasoningEffort  string `json:"reasoning_effort"`
+		Daybreak         bool   `json:"daybreak_enabled"`
 		ProfileID        *int64 `json:"profile_id"`         // 测已存 profile 时传入：api_key 为空则用它存的 key
 		Streaming        *bool  `json:"streaming"`          // 省略=流式，与保存 profile 时同一套默认
 		SessionHeaderKey string `json:"session_header_key"` // 非空=测试时也带该自定义会话头，值为一次性随机 session id
@@ -1495,6 +1519,7 @@ func (s *Server) testLLM(w http.ResponseWriter, r *http.Request) {
 	// reasoning_effort/thinking field fails the test too (no false "test ok, run 400").
 	cfg.ThinkingType = req.ThinkingType
 	cfg.ReasoningEffort = req.ReasoningEffort
+	cfg.Daybreak = cfg.ChatGPT && req.Daybreak
 	// 同理，收发模式也照该 profile 的选择来：只支持其中一种通道的端点必须在这里就
 	// 暴露，而不是等会话里才发现"测试通过的配置根本跑不动"。
 	if req.Streaming != nil {
@@ -1516,6 +1541,10 @@ func (s *Server) testLLM(w http.ResponseWriter, r *http.Request) {
 				cfg.SessionHeaderKey = p.SessionHeaderKey
 			}
 		}
+	}
+	if cfg.ChatGPT && !s.attachChatGPTAuth(&cfg) {
+		writeJSON(w, 200, map[string]any{"ok": false, "error": "ChatGPT 계정을 먼저 연결해 주세요"})
+		return
 	}
 	if cfg.APIKey == "" {
 		s.cfgMu.Lock()
