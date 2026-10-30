@@ -258,14 +258,14 @@ func workerTrafficBlock(recording bool) string {
 // pentest agent's prompt — intermediate artifacts must land in the shared work
 // dir, never /tmp. Guaranteed present regardless of how the DB body is edited.
 func artifactSpec(dir string) string {
-	return "\n\n**중간 산출물 저장 규칙**: 스크립트, payload, 수집한 응답 본문, 임시 데이터 등 모든 중간 산출물은 작업 디렉터리 " + dir + "에 저장하세요. 상대 경로를 사용하거나 이 디렉터리의 절대 경로를 사용하세요. /tmp 또는 다른 절대 경로에 저장하지 마세요."
+	return "\n\n**중간 산출물 저장 규칙**: 스크립트, payload, 수집한 응답 본문, 임시 데이터 등 모든 중간 산출물은 작업 디렉터리 " + dir + "에 저장하세요. 문제 파일과 사용자 자료도 이 디렉터리 안에서만 읽고, 디렉터리 밖의 사용자 파일은 열람하거나 변경하지 마세요. 상대 경로를 사용하거나 이 디렉터리의 절대 경로를 사용하세요. /tmp 또는 다른 절대 경로에 저장하지 마세요."
 }
 
 // workerArtifactSpec is the worker's 段 [C]: its per-intent run dir is pre-created
 // by the engine (ensureRunDir), so it just writes relative paths there — no manual
 // mkdir, no cross-worker name collisions.
 func workerArtifactSpec(runDir string) string {
-	return "\n\n**중간 산출물 저장 규칙**: 스크립트, payload, 수집한 응답 본문, 임시 데이터 등 모든 중간 산출물은 이 의도의 전용 작업 디렉터리 " + runDir + "에 저장하세요. 디렉터리는 이미 만들어져 있으므로 상대 경로를 사용하세요. /tmp 또는 다른 절대 경로에 저장하지 마세요."
+	return "\n\n**중간 산출물 저장 규칙**: 스크립트, payload, 수집한 응답 본문, 임시 데이터 등 모든 중간 산출물은 이 의도의 전용 작업 디렉터리 " + runDir + "에 저장하세요. 문제 파일과 사용자 자료는 상위 작업 디렉터리 " + filepath.Dir(runDir) + " 안에서만 읽고, 그 밖의 사용자 파일은 열람하거나 변경하지 마세요. 출력 디렉터리는 이미 만들어져 있으므로 상대 경로를 사용하세요. /tmp 또는 다른 절대 경로에 저장하지 마세요."
 }
 
 // ensureRunDir builds and creates an agent's working directory under base:
@@ -290,7 +290,7 @@ func workerSystem(proxyAddr, caCert, dataDir, runDir string) string {
 	// caCert is present only when the recording MITM is on, which is exactly when
 	// the traffic_* tools are registered — so it gates the traffic-tool note.
 	// Optional finding guidance is added for every role after tool resolution.
-	return body + workerTrafficBlock(caCert != "") + workerArtifactSpec(runDir) + langDirective(resolveOutputLang())
+	return body + workerTrafficBlock(caCert != "") + workerArtifactSpec(runDir) + ctfSourceDirective + langDirective(resolveOutputLang())
 }
 
 // renderIntentTask formats the claimed intent for the worker's launch USER message:

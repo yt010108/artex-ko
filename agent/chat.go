@@ -78,13 +78,13 @@ func (c *ChatAgent) SetGuard(g *guard.Guard) { c.guard = g }
 // agent's system prompt. Mirrors artifactSpec but without pentest-specific
 // wording ("payload", "抓响应体") that would be odd in a general assistant.
 func chatWorkDirSpec(workDir string) string {
-	return "\n\n**파일 출력 프로토콜 **: 파일을 작성해야 하는 경우 작업 디렉터리에 작성해야 합니다." + workDir + "(기본값은 CWD이며 상대경로가 들어가는 곳으로, 절대경로도 사용 가능합니다.) - /tmp 또는 기타 절대경로를 쓰지 마세요."
+	return "\n\n**파일 출력 프로토콜**: 문제 파일과 사용자 자료는 작업 디렉터리 " + workDir + " 안에서만 읽고, 디렉터리 밖의 사용자 파일은 열람하거나 변경하지 마세요. 작성하는 파일도 이 디렉터리에 저장하세요. 상대 경로 또는 이 디렉터리의 절대 경로를 사용하고 /tmp나 다른 절대 경로에는 저장하지 마세요."
 }
 
 // chatSystem renders the DB-managed prompt body for agentKey. Custom agents have
 // no per-key in-code default, so DefaultAssistantPrompt is the render fallback.
 func chatSystem(agentKey, dataDir, workDir string) string {
-	return renderSystem(agentKey, DefaultAssistantPrompt, chatVars{DataDir: dataDir, Now: nowStr()}) + chatWorkDirSpec(workDir) + langDirective(resolveOutputLang())
+	return renderSystem(agentKey, DefaultAssistantPrompt, chatVars{DataDir: dataDir, Now: nowStr()}) + chatWorkDirSpec(workDir) + ctfSourceDirective + langDirective(resolveOutputLang())
 }
 
 // chatVars carries the runtime variables a custom agent's prompt may reference.

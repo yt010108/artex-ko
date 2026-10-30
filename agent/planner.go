@@ -315,7 +315,7 @@ const plannerDefaultTmpl = `당신은 승인된 보안 테스트의 계획 에�
 
 func plannerSystem(goal, dataDir, workDir string) string {
 	body := renderSystem("planner", plannerDefaultTmpl, PlannerVars{Goal: goal, DataDir: dataDir, Now: nowStr()})
-	return body + artifactSpec(workDir) + langDirective(resolveOutputLang())
+	return body + artifactSpec(workDir) + ctfSourceDirective + langDirective(resolveOutputLang())
 }
 
 // Plan runs one planning round. emit, if non-nil, receives the planner's execution

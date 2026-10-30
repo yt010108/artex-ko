@@ -97,7 +97,7 @@ const mainAgentDefaultTmpl = `당신은 승인된 보안 테스트의 메인 에
 
 func mainAgentSystem(goal, dataDir, workDir string) string {
 	body := renderSystem("mainagent", mainAgentDefaultTmpl, MainVars{Goal: goal, DataDir: dataDir, Now: nowStr()})
-	return body + artifactSpec(workDir) + langDirective(resolveOutputLang())
+	return body + artifactSpec(workDir) + ctfSourceDirective + langDirective(resolveOutputLang())
 }
 
 // Chat handles one human message and returns the assistant reply. emit, if

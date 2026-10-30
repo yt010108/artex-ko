@@ -90,6 +90,9 @@ func langDirective(code string) string {
 	return base
 }
 
+// ctfSourceDirective applies even when an agent's editable prompt was customized.
+const ctfSourceDirective = "\n\nCTF 문제 풀이 규칙: 문제 라이트업, 풀이, 정답 또는 관련 자료를 웹 검색이나 외부 사이트에서 찾지 마세요. 사용자가 제공한 도메인·URL, 작업 디렉터리의 문제 파일과 자료, 해당 대상에서 직접 얻은 응답만 사용하세요. 제공되지 않은 다른 도메인이나 자료로 범위를 넓히지 마세요."
+
 func renderTmpl(tmpl string, vars any) (string, error) {
 	t, err := template.New("p").Option("missingkey=error").Parse(tmpl)
 	if err != nil {
